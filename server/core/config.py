@@ -7,8 +7,9 @@ class Settings(BaseSettings):
     DOMAIN: str = "uavdb.asfes.ru"
     DEV: bool = True
     ROOT_PASSWORD: str = "root"
-    BACKBLAZE_APPLICATION_KEY: str
-    BACKBLAZE_APPLICATION_KEY_ID: str
+    BACKBLAZE_APPLICATION_KEY: str = None
+    BACKBLAZE_APPLICATION_KEY_ID: str = None
+    SECRET_KEY: str
 
     class Config:
         env_file = ".env"

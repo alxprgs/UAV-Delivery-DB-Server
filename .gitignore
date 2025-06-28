@@ -6,8 +6,9 @@ __pycache__/
 # C extensions
 *.so
 
-# logs
-*/logs
+# data
+logs/
+db_files/
 
 # Distribution / packaging
 .Python

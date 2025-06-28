@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 import aiofiles
 from .config import settings
+from datetime import date
 from server.core.functions.hash_functions import sha256_hash
 
 async def init_root_user() -> bool:
@@ -16,6 +17,9 @@ async def init_root_user() -> bool:
             "delete": True,
             "create_acc": True
         },
+        "role": "admin",
+        "disabled": False,
+        "created_at": date.today().isoformat(),
     }
 
     file_path = Path("server") / "core" / "db" / "users.json"
