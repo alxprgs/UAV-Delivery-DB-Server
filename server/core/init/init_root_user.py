@@ -1,8 +1,7 @@
 import json
-from pathlib import Path
 from datetime import date
-
 import aiofiles
+
 from server.core.config import settings
 from server.core.functions.hash_functions import sha256_hash
 from server.core.paths import USERS_DIR
@@ -12,7 +11,6 @@ async def init_root_user() -> bool:
 
     file_path = USERS_DIR / "root.json"
 
-    # не перезаписываем, если уже есть root
     if file_path.exists():
         return True
 
@@ -28,7 +26,7 @@ async def init_root_user() -> bool:
         },
         "role": "admin",
         "disabled": False,
-        "created_at": date.today().isoformat(),
+        "created_at": date.today().isoformat()
     }
 
     async with aiofiles.open(file_path, "w", encoding="utf-8") as f:

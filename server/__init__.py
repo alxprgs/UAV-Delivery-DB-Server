@@ -1,18 +1,20 @@
-from fastapi import FastAPI
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
-from server.core.config import settings
-from pathlib import Path
-from server.core.init_root_user import init_root_user
-from b2sdk.v1 import InMemoryAccountInfo, B2Api
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from datetime import datetime, date
-from server.core.paths import USERS_DIR, WORKERS_DIR
-from server.core.logger_module import logger
-import aiofiles
+import os
 import shutil
 import tempfile
-import os
+from datetime import date, datetime
+from pathlib import Path
+from typing import AsyncGenerator
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from b2sdk.v1 import B2Api, InMemoryAccountInfo
+
+from server.core.config import settings
+from server.core.init.init_ceo_worker import init_ceo_worker
+from server.core.init.init_root_user import init_root_user
+from server.core.logger_module import logger
+from server.core.paths import USERS_DIR, WORKERS_DIR
 
 scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
 
@@ -48,17 +50,6 @@ async def beckup_event(bucket):
 async def check_file(file_path: Path):
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
-async def init_ceo():
-    ceo = {
-        "name": settings.CEO_NAME,
-        "post": "CEO",
-        "mail": f"ceo@{settings.BASE_DOMAIN}",
-        "access": {
-            "all": True
-        }
-    }
-    
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     info = InMemoryAccountInfo()
@@ -80,14 +71,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             bucket = b2.create_bucket("UAV-DB-backups", BucketType.ALL_PRIVATE)
         app.state.bucket = bucket
     await init_root_user()
-    await init_ceo()
+    await init_ceo_worker()
 
     from server.routes.tools import ping
     from server.routes.db import auth, delete, find, insert, update
+    from server.routes.specialized_db.rfid import auth_card
 
     if settings.BACKBLAZE_APPLICATION_KEY_ID and settings.BACKBLAZE_APPLICATION_KEY: 
         scheduler.add_job(beckup_event, trigger="interval", hours=1, minutes=0, args=[bucket], id="daily_backup", replace_existing=True)
         scheduler.start()
+
+    blocked: dict[str, datetime] = {}
+    app.state.blocked = blocked
 
     yield
     if settings.BACKBLAZE_APPLICATION_KEY_ID and settings.BACKBLAZE_APPLICATION_KEY: 
@@ -102,7 +97,7 @@ docs_config = {
 app = FastAPI(
     debug=settings.DEV,
     title="База данных специально для UAV-Delivery",
-    version=f"{'dev' if settings.DEV else 'stable'} 0.0.3 {date.today().isoformat()}",
+    version=f"{'dev' if settings.DEV else 'stable'} 0.0.4 {date.today().isoformat()}",
     lifespan=lifespan,
     **docs_config,
 )

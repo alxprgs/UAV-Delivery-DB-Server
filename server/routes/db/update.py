@@ -1,53 +1,65 @@
 import json
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 import aiofiles
-from fastapi import status, Request, HTTPException, Header
+from fastapi import status, Request, Depends, Body
 from fastapi.responses import JSONResponse
 
 from server import app
-from server.core.functions.db_functions import check_user
 from server.core.paths import DB_DIR
+from server.core.security import require_access
 
-@app.post("/db/update/{db}/{collection}", status_code=status.HTTP_200_OK, tags=["db"])
+@app.post(
+    "/db/update/{db}/{collection}",
+    status_code=status.HTTP_200_OK,
+    tags=["db"],
+)
 async def db_update(
     request: Request,
     db: str,
     collection: str,
-    query: Dict[str, Any],
-    jwt_token: str = Header(..., alias="JWT_TOKEN")
-) -> JSONResponse:
-    auth_ok, user = await check_user(jwt_token=jwt_token)
-    if not auth_ok:
-        raise HTTPException(status_code=403, detail="Invalid or expired token")
-    if not user.get("access", {}).get("update", False):
-        return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"status": False, "message": "No update permission"})
-
+    query: Dict[str, Any] = Body(
+        ...,
+        examples={
+            "activate": {
+                "summary": "Перевести статус из old в active",
+                "value": {
+                    "filter": {"status": "old"},
+                    "update": {"status": "active"},
+                },
+            },
+            "change_name": {
+                "summary": "Изменить имя",
+                "value": {
+                    "filter": {"name": "Battery 4S"},
+                    "update": {"name": "Battery 4S Pro"},
+                },
+            },
+        },
+    ),
+    user: Dict = Depends(require_access("update")),
+):
     filter_ = query.get("filter")
     update_data = query.get("update")
     if not isinstance(filter_, dict) or not isinstance(update_data, dict):
-        raise HTTPException(status_code=400, detail="Body must contain 'filter' and 'update' objects")
+        return JSONResponse(
+            status_code=400,
+            content={"status": False, "message": "Body должен содержать 'filter' и 'update'"},
+        )
 
     collection_dir = DB_DIR / db / collection
     if not collection_dir.exists():
-        return JSONResponse(status_code=status.HTTP_200_OK, content={"status": True, "updated": 0})
+        return JSONResponse(status_code=200, content={"status": True, "updated": 0})
 
     updated = 0
-    async for entry in _iter_dir(collection_dir):
-        doc_path = entry
-        async with aiofiles.open(doc_path, "r", encoding="utf-8") as f:
-            raw = await f.read()
-            doc = json.loads(raw)
-
+    for path in collection_dir.glob("*.json"):
+        async with aiofiles.open(path, "r", encoding="utf-8") as f:
+            doc = json.loads(await f.read())
         if all(doc.get(k) == v for k, v in filter_.items()):
             doc.update(update_data)
-            async with aiofiles.open(doc_path, "w", encoding="utf-8") as f:
+            async with aiofiles.open(path, "w", encoding="utf-8") as f:
                 await f.write(json.dumps(doc, ensure_ascii=False, indent=4))
             updated += 1
 
-    return JSONResponse(status_code=status.HTTP_200_OK, content={"status": True, "updated": updated})
-
-async def _iter_dir(dir_path: Path):
-    for item in dir_path.glob("*.json"):
-        yield item
+    return JSONResponse(status_code=200, content={"status": True, "updated": updated})

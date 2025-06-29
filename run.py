@@ -4,7 +4,7 @@ import sys
 from server import app
 
 async def main():
-    config = uvicorn.Config("server:app", port=31987, host="0.0.0.0")
+    config = uvicorn.Config("server:app", port=31987, host="0.0.0.0", http="auto")
     server = uvicorn.Server(config)
     await server.serve()
 

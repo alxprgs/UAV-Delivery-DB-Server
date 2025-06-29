@@ -3,39 +3,48 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import aiofiles
-from fastapi import status, Request, HTTPException, Header, Query
+from fastapi import status, Request, Depends, Body, Query
 from fastapi.responses import JSONResponse
 
 from server import app
-from server.core.functions.db_functions import check_user, _load_json as load_json
 from server.core.paths import DB_DIR
+from server.core.security import require_access
 
-@app.post("/db/find/{db}/{collection}", status_code=status.HTTP_200_OK, tags=["db"])
+@app.post(
+    "/db/find/{db}/{collection}",
+    status_code=status.HTTP_200_OK,
+    tags=["db"],
+)
 async def db_find(
     request: Request,
     db: str,
     collection: str,
-    query: Dict[str, Any],
-    jwt_token: str = Header(..., alias="JWT_TOKEN"),
+    query: Dict[str, Any] = Body(
+        default={},
+        examples={
+            "by_name": {
+                "summary": "Фильтр по имени",
+                "value": {"name": "Battery 4S"},
+            },
+            "empty": {
+                "summary": "Без фильтра (вернуть все документы)",
+                "value": {},
+            },
+        },
+    ),
+    user: Dict = Depends(require_access("find")),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1),
-    sort: Optional[str] = Query(None, description="field:asc|desc")
-) -> JSONResponse:
-    auth_ok, user = await check_user(jwt_token=jwt_token)
-    if not auth_ok:
-        raise HTTPException(status_code=403, detail="Invalid or expired token")
-    if not user.get("access", {}).get("find", False):
-        return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"status": False, "message": "No find permission"})
-
+    sort: Optional[str] = Query(None, description="field:asc|desc"),
+):
     collection_dir = DB_DIR / db / collection
     if not collection_dir.exists():
-        return JSONResponse(status_code=status.HTTP_200_OK, content={"status": True, "total": 0, "data": []})
+        return JSONResponse(status_code=200, content={"status": True, "total": 0, "data": []})
 
     docs: List[Dict[str, Any]] = []
     for path in collection_dir.glob("*.json"):
-        doc = await load_json(path)
-        if doc is None:
-            continue
+        async with aiofiles.open(path, "r", encoding="utf-8") as f:
+            doc = json.loads(await f.read())
         if all(doc.get(k) == v for k, v in query.items()):
             docs.append(doc)
 
@@ -47,7 +56,11 @@ async def db_find(
         except TypeError:
             pass
 
-    total = len(docs)
-    paginated = docs[skip: skip + limit]
-
-    return JSONResponse(status_code=status.HTTP_200_OK, content={"status": True, "total": total, "skip": skip, "limit": limit, "data": paginated})
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": True,
+            "total": len(docs),
+            "data": docs[skip : skip + limit],
+        },
+    )

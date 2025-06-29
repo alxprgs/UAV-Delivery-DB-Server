@@ -1,16 +1,13 @@
-import json
 from pathlib import Path
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+import json, jwt, aiofiles
 
-import jwt
-import aiofiles
-from fastapi import status, Request
+from fastapi import status, Request, Body
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from server import app
 from server.core.config import settings
-from server.core.paths import USERS_DIR
 from server.core.functions.hash_functions import verify_sha256
 from server.core.functions.log_functions import write_log
 
@@ -18,35 +15,43 @@ class DBAuthScheme(BaseModel):
     username: str
     password: str
 
-@app.post("/db/auth/db", status_code=status.HTTP_200_OK, tags=["db"])
-async def db_auth(request: Request, data: DBAuthScheme) -> JSONResponse:
-    user_file = USERS_DIR / f"{data.username}.json"
-    user_data = None
-    try:
-        async with aiofiles.open(user_file, "r", encoding="utf-8") as f:
-            raw = await f.read()
-            user_data = json.loads(raw) if raw.strip() else None
-    except FileNotFoundError:
-        pass
+@app.post(
+    "/db/auth/db",
+    status_code=status.HTTP_200_OK,
+    tags=["db"],
+)
+async def db_auth(
+    request: Request,
+    data: DBAuthScheme = Body(
+        ...,
+        examples={
+            "root": {
+                "summary": "Войти под root",
+                "value": {"username": "root", "password": "<ROOT_PASSWORD>"},
+            },
+            "user": {
+                "summary": "Войти под обычным пользователем",
+                "value": {"username": "user1", "password": "<USER_PASSWORD>"},
+            },
+        },
+    ),
+) -> JSONResponse:
+    users_file = Path("server/core/db_files/users.json")
 
-    if not isinstance(user_data, dict):
-        await write_log(endpoint="DB auth", request=request, status="Forbidden")
-        return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"status": False, "message": "Неверный логин или пароль."})
+    async with aiofiles.open(users_file, "r", encoding="utf-8") as f:
+        raw = await f.read()
+    data_json = json.loads(raw) if raw.strip() else {}
 
-    if user_data.get("disabled", False):
+    user = data_json.get(data.username)
+    if not isinstance(user, dict) or not verify_sha256(data.password, user.get("password", "")):
         await write_log(endpoint="DB auth", request=request, status="Forbidden")
-        return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"status": False, "message": "Аккаунт заблокирован."})
-
-    if not verify_sha256(text=data.password, expected_hash=user_data.get("password")):
-        await write_log(endpoint="DB auth", request=request, status="Forbidden")
-        return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"status": False, "message": "Неверный логин или пароль."})
+        return JSONResponse(status_code=403, content={"status": False, "message": "Неверный логин или пароль."})
 
     payload = {
         "sub": data.username,
-        "role": user_data.get("role", "user"),
-        "exp": datetime.now(tz=timezone.utc) + timedelta(hours=24)
+        "role": user.get("access", {}).get("role", "user"),
+        "exp": datetime.now() + timedelta(hours=24),
     }
     token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
-
     await write_log(endpoint="DB auth", request=request, status="OK")
-    return JSONResponse(status_code=status.HTTP_200_OK, content={"status": True, "JWT_Token": token})
+    return JSONResponse(status_code=200, content={"status": True, "JWT_Token": token})
