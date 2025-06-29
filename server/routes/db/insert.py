@@ -1,20 +1,17 @@
 import json
 import uuid
 from pathlib import Path
+from typing import Dict, Any
 
 import aiofiles
 from fastapi import status, Request, HTTPException, Header
 from fastapi.responses import JSONResponse
-from typing import Dict, Any
 
 from server import app
 from server.core.functions.db_functions import check_user
+from server.core.paths import DB_DIR
 
-@app.post(
-    path="/db/insert/{db}/{collection}",
-    status_code=status.HTTP_201_CREATED,
-    tags=["db"]
-)
+@app.post("/db/insert/{db}/{collection}", status_code=status.HTTP_201_CREATED, tags=["db"])
 async def db_insert(
     request: Request,
     db: str,
@@ -25,46 +22,24 @@ async def db_insert(
     auth_ok, user = await check_user(jwt_token=jwt_token)
     if not auth_ok:
         raise HTTPException(status_code=403, detail="Invalid or expired token")
-
     if not user.get("access", {}).get("insert", False):
-        return JSONResponse(
-            status_code=status.HTTP_403_FORBIDDEN,
-            content={"status": False, "message": "No insert permission"}
-        )
+        return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"status": False, "message": "No insert permission"})
 
-    project_root = Path(__file__).resolve().parents[3]
-    db_root = project_root / "server" / "core" / "db_files"
-    collection_dir = db_root / db
+    if not isinstance(query, dict):
+        raise HTTPException(status_code=400, detail="Body must be a JSON object")
+
+    collection_dir = DB_DIR / db / collection
     collection_dir.mkdir(parents=True, exist_ok=True)
-    file_path = collection_dir / f"{collection}.json"
 
-    try:
-        async with aiofiles.open(file_path, mode="r", encoding="utf-8") as f:
-            raw = await f.read()
-            documents = json.loads(raw) if raw.strip() else []
-    except FileNotFoundError:
-        documents = []
-    except json.JSONDecodeError:
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"status": False, "message": "Corrupted collection file"}
-        )
-
-    existing_ids = {doc.get("id") for doc in documents if "id" in doc}
-    new_id = None
     while True:
-        candidate = uuid.uuid4().hex
-        if candidate not in existing_ids:
-            new_id = candidate
+        doc_id = uuid.uuid4().hex
+        file_path = collection_dir / f"{doc_id}.json"
+        if not file_path.exists():
             break
 
-    new_doc = {"id": new_id, **query}
-    documents.append(new_doc)
+    doc = {"id": doc_id, **query}
 
     async with aiofiles.open(file_path, mode="w", encoding="utf-8") as f:
-        await f.write(json.dumps(documents, ensure_ascii=False, indent=4))
+        await f.write(json.dumps(doc, ensure_ascii=False, indent=4))
 
-    return JSONResponse(
-        status_code=status.HTTP_201_CREATED,
-        content={"status": True, "message": "Inserted", "data": new_doc}
-    )
+    return JSONResponse(status_code=status.HTTP_201_CREATED, content={"status": True, "data": doc})

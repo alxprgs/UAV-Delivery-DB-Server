@@ -13,6 +13,7 @@ async def write_log(endpoint: str, request: Request, log_dir: Path = LOG_DIR, st
     digest = sha256_hash(payload)
     log_line = f"{payload}|{digest}\n"
 
+    log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"{date.today().isoformat()}.logs"
     try:
         async with aiofiles.open(log_path, "a", encoding="utf-8") as f:

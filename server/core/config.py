@@ -5,11 +5,14 @@ load_dotenv(override=True)
 
 class Settings(BaseSettings):
     DOMAIN: str = "uavdb.asfes.ru"
+    BASE_DOMAIN: str = "asfes.ru"
+    CEO_NAME: str = "Alx"
     DEV: bool = True
     ROOT_PASSWORD: str = "root"
-    BACKBLAZE_APPLICATION_KEY: str = None
-    BACKBLAZE_APPLICATION_KEY_ID: str = None
+    BACKBLAZE_APPLICATION_KEY: str = ""
+    BACKBLAZE_APPLICATION_KEY_ID: str = ""
     SECRET_KEY: str
+    SECURITY_ACESS_CODE: str
 
     class Config:
         env_file = ".env"

@@ -1,19 +1,14 @@
-import json
 from pathlib import Path
+from typing import Any, Dict
 
-import aiofiles
 from fastapi import status, Request, HTTPException, Header
 from fastapi.responses import JSONResponse
-from typing import Any, Dict, List, Tuple
 
 from server import app
-from server.core.functions.db_functions import check_user
+from server.core.functions.db_functions import check_user, _load_json
+from server.core.paths import DB_DIR
 
-@app.post(
-    "/db/delete/{db}/{collection}",
-    status_code=status.HTTP_200_OK,
-    tags=["db"]
-)
+@app.post("/db/delete/{db}/{collection}", status_code=status.HTTP_200_OK, tags=["db"])
 async def db_delete(
     request: Request,
     db: str,
@@ -25,49 +20,22 @@ async def db_delete(
     if not auth_ok:
         raise HTTPException(status_code=403, detail="Invalid or expired token")
     if not user.get("access", {}).get("delete", False):
-        return JSONResponse(
-            status_code=status.HTTP_403_FORBIDDEN,
-            content={"status": False, "message": "No delete permission"}
-        )
+        return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"status": False, "message": "No delete permission"})
 
-    project_root = Path(__file__).resolve().parents[3]
-    db_root = project_root / "server" / "core" / "db_files"
-    collection_dir = db_root / db
-    collection_dir.mkdir(parents=True, exist_ok=True)
-    file_path = collection_dir / f"{collection}.json"
+    if not isinstance(query, dict):
+        raise HTTPException(status_code=400, detail="Body must be a JSON object")
 
-    try:
-        async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
-            raw = await f.read()
-            docs: List[Dict[str, Any]] = json.loads(raw) if raw.strip() else []
-    except FileNotFoundError:
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={"status": True, "deleted": 0, "message": "Collection not found, nothing deleted"}
-        )
-    except json.JSONDecodeError:
-        raise HTTPException(
-            status_code=500,
-            detail="Corrupted collection file"
-        )
+    collection_dir = DB_DIR / db / collection
+    if not collection_dir.exists():
+        return JSONResponse(status_code=status.HTTP_200_OK, content={"status": True, "deleted": 0})
 
-    to_keep: List[Dict[str, Any]] = []
-    deleted_count = 0
-
-    for doc in docs:
+    deleted = 0
+    for path in list(collection_dir.glob("*.json")):
+        doc = await _load_json(path)
+        if doc is None:
+            continue
         if all(doc.get(k) == v for k, v in query.items()):
-            deleted_count += 1
-        else:
-            to_keep.append(doc)
+            path.unlink(missing_ok=True)
+            deleted += 1
 
-    async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
-        await f.write(json.dumps(to_keep, ensure_ascii=False, indent=4))
-
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content={
-            "status": True,
-            "deleted": deleted_count,
-            "filter": query
-        }
-    )
+    return JSONResponse(status_code=status.HTTP_200_OK, content={"status": True, "deleted": deleted})

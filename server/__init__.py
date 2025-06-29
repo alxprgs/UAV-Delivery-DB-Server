@@ -7,6 +7,9 @@ from server.core.init_root_user import init_root_user
 from b2sdk.v1 import InMemoryAccountInfo, B2Api
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from datetime import datetime, date
+from server.core.paths import USERS_DIR, WORKERS_DIR
+from server.core.logger_module import logger
+import aiofiles
 import shutil
 import tempfile
 import os
@@ -32,16 +35,29 @@ async def beckup_event(bucket):
                         file_name=f"backups/{today}/{archive_name}.zip"
                     )
                 except Exception as e:
-                    print(f"Ошибка загрузки бекапа: {e} ({datetime.now().isoformat()})")
+                    logger.error("Ошибка закгрузки бекапа: %s "+ f"({datetime.now().isoformat()})", e, exc_info=True)
                     return False
-            print("Успешный бекап баз данных")
+            logger.info("Успешный бекап баз данных")
             return True
         except Exception as e:
-            print(f"Ошибка бекапа: {e} ({datetime.now().isoformat()})")
+            logger.error("Ошибка бекапа: %s "+ f"({datetime.now().isoformat()})", e, exc_info=True)
             return False
     else:
         return False
+    
+async def check_file(file_path: Path):
+    file_path.parent.mkdir(parents=True, exist_ok=True)
 
+async def init_ceo():
+    ceo = {
+        "name": settings.CEO_NAME,
+        "post": "CEO",
+        "mail": f"ceo@{settings.BASE_DOMAIN}",
+        "access": {
+            "all": True
+        }
+    }
+    
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -49,6 +65,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     b2 = B2Api(info)
     (Path("server") / "logs").mkdir(parents=True, exist_ok=True)
     (Path("server") / "core" / "db_files").mkdir(parents=True, exist_ok=True)
+    paths = [
+        USERS_DIR,
+        WORKERS_DIR,
+    ]
+    for path in paths:
+        await check_file(file_path=path)
     b2.authorize_account("production", settings.BACKBLAZE_APPLICATION_KEY_ID, settings.BACKBLAZE_APPLICATION_KEY)
     if settings.BACKBLAZE_APPLICATION_KEY_ID and settings.BACKBLAZE_APPLICATION_KEY: 
         try:
@@ -58,6 +80,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             bucket = b2.create_bucket("UAV-DB-backups", BucketType.ALL_PRIVATE)
         app.state.bucket = bucket
     await init_root_user()
+    await init_ceo()
 
     from server.routes.tools import ping
     from server.routes.db import auth, delete, find, insert, update
@@ -79,7 +102,7 @@ docs_config = {
 app = FastAPI(
     debug=settings.DEV,
     title="База данных специально для UAV-Delivery",
-    version=f"{'dev' if settings.DEV else 'stable'} 0.0.2 {date.today().isoformat()}",
+    version=f"{'dev' if settings.DEV else 'stable'} 0.0.3 {date.today().isoformat()}",
     lifespan=lifespan,
     **docs_config,
 )
