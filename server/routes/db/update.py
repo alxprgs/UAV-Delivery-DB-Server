@@ -1,15 +1,14 @@
 import json
-from pathlib import Path
-from typing import Dict, Any
 
 import aiofiles
-from fastapi import status, Request, Depends, Body
+from fastapi import status, Request, Depends
 from fastapi.responses import JSONResponse
 
 from server import app
 from server.core.paths import DB_DIR
-from server.core.security import require_access
 from server.events.viewing_event import viewing_event
+from server.core.api.schemes.DBUpdateScheme import DBUpdateScheme
+from server.core.security import require_access
 
 @app.post(
     "/db/update/{db}/{collection}",
@@ -18,39 +17,19 @@ from server.events.viewing_event import viewing_event
 )
 async def db_update(
     request: Request,
-    db: str,
-    collection: str,
-    query: Dict[str, Any] = Body(
-        ...,
-        openapi_examples={
-            "activate": {
-                "summary": "Перевести статус из old в active",
-                "value": {
-                    "filter": {"status": "old"},
-                    "update": {"status": "active"},
-                },
-            },
-            "change_name": {
-                "summary": "Изменить имя",
-                "value": {
-                    "filter": {"name": "Battery 4S"},
-                    "update": {"name": "Battery 4S Pro"},
-                },
-            },
-        },
-    ),
-    user: Dict = Depends(require_access("update")),
+    data: DBUpdateScheme,
+    user: dict = Depends(require_access("update"))
 ):
     await viewing_event(request)
-    filter_ = query.get("filter")
-    update_data = query.get("update")
+    filter_ = data.query.get("filter")
+    update_data = data.query.get("update")
     if not isinstance(filter_, dict) or not isinstance(update_data, dict):
         return JSONResponse(
             status_code=400,
             content={"status": False, "message": "Body должен содержать 'filter' и 'update'"},
         )
 
-    collection_dir = DB_DIR / db / collection
+    collection_dir = DB_DIR / data.db / data.collection
     if not collection_dir.exists():
         return JSONResponse(status_code=200, content={"status": True, "updated": 0})
 

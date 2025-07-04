@@ -44,7 +44,7 @@ docs_config = {
 app = FastAPI(
     debug=settings.DEV,
     title="База данных специально для UAV-Delivery",
-    version=f"{'dev' if settings.DEV else 'stable'} 0.0.5 {date.today().isoformat()}",
+    version=f"{'dev' if settings.DEV else 'stable'} 0.1.0 {date.today().isoformat()}",
     lifespan=lifespan,
     **docs_config,
 )

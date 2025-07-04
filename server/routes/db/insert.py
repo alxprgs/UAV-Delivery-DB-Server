@@ -1,15 +1,14 @@
 import json, uuid
-from pathlib import Path
-from typing import Dict, Any
 
 import aiofiles
-from fastapi import status, Request, Depends, Body
+from fastapi import status, Request, Depends
 from fastapi.responses import JSONResponse
 
 from server import app
 from server.core.paths import DB_DIR
-from server.core.security import require_access
 from server.events.viewing_event import viewing_event
+from server.core.api.schemes.DBInsertScheme import DBInsertScheme
+from server.core.security import require_access
 
 @app.post(
     "/db/insert/{db}/{collection}",
@@ -18,25 +17,11 @@ from server.events.viewing_event import viewing_event
 )
 async def db_insert(
     request: Request,
-    db: str,
-    collection: str,
-    query: Dict[str, Any] = Body(
-        ...,
-        openapi_examples={
-            "battery": {
-                "summary": "Добавить аккумулятор",
-                "value": {"name": "Battery 4S", "capacity": 2200, "unit": "mAh"},
-            },
-            "motor": {
-                "summary": "Добавить мотор",
-                "value": {"name": "Motor 2212", "kv": 920},
-            },
-        },
-    ),
-    user: Dict = Depends(require_access("insert")),
+    data: DBInsertScheme,
+    user: dict = Depends(require_access("insert"))
 ):
     await viewing_event(request)
-    collection_dir = DB_DIR / db / collection
+    collection_dir = DB_DIR / data.db / data.collection
     collection_dir.mkdir(parents=True, exist_ok=True)
 
     while True:
@@ -45,7 +30,7 @@ async def db_insert(
         if not file_path.exists():
             break
 
-    doc = {"id": doc_id, **query}
+    doc = {"id": doc_id, **data.query}
     async with aiofiles.open(file_path, "w", encoding="utf-8") as f:
         await f.write(json.dumps(doc, ensure_ascii=False, indent=4))
 

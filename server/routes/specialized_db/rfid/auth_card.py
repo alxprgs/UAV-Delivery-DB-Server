@@ -8,23 +8,24 @@ from server.core.functions.db_functions import open_json
 from datetime import datetime, timedelta
 import jwt
 from server.events.viewing_event import viewing_event
+from server.core.api.schemes.SpecializedDBRfidCardAuthScheme import SpecializedDBRfidCardAuthScheme
 
 TTL = timedelta(minutes=30)
 
 @app.post("/db/auth/card")
-async def card_auth(request: Request, guard_code: str = Body(...), cardid: str = Body(...)):
+async def specialized_db_rfid_card_auth(request: Request, data: SpecializedDBRfidCardAuthScheme):
     await viewing_event(request)
     ip = request.headers.get("X-Forwarded-For", request.client.host).split(',')[0].strip()
     if banned(ip):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "IP заблокирован на 30 минут")
-    if guard_code != settings.SECURITY_ACCESS_CODE:
+    if data.guard_code != settings.SECURITY_ACCESS_CODE:
         app.state.blocked[ip] = datetime.utcnow() + TTL
         return JSONResponse(content={"status": False, "message": "Неверный код доступа охраны, IP заблокирован на 30 минут"})
     
     user = post = None
     for worker_path in WORKERS_DIR.glob("*.json"):
         data = await open_json(worker_path)
-        if data.get("cardid") == cardid:
+        if data.get("cardid") == data.cardid:
             user, post = data["name"], data["post"]
             break
 
