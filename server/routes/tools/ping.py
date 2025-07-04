@@ -1,13 +1,14 @@
 from server import app
 from fastapi import status, Request
 from fastapi.responses import JSONResponse
-from server.core.functions.hash_functions import sha256_hash
 from server.core.functions.log_functions import write_log
+from server.events.viewing_event import viewing_event
 from time import perf_counter
 import psutil
 
 @app.get(path="/tools/ping/v1", status_code=status.HTTP_200_OK, tags=["tools"])
 async def pingv1(request: Request) -> JSONResponse:
+    await viewing_event(request)
     statuswrite = await write_log(endpoint="Ping_V1", request=request)
     if statuswrite == False:
         try:
@@ -22,6 +23,7 @@ async def pingv1(request: Request) -> JSONResponse:
 
 @app.get(path="/tools/ping/v2", status_code=status.HTTP_200_OK, tags=["tools"])
 async def pingv2(request: Request) -> JSONResponse:
+    await viewing_event(request)
     start = perf_counter()
     statuswrite = await write_log(endpoint="Ping_V2", request=request)
     if statuswrite == False:

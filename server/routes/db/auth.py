@@ -10,6 +10,7 @@ from server import app
 from server.core.config import settings
 from server.core.functions.hash_functions import verify_sha256
 from server.core.functions.log_functions import write_log
+from server.events.viewing_event import viewing_event
 
 class DBAuthScheme(BaseModel):
     username: str
@@ -24,7 +25,7 @@ async def db_auth(
     request: Request,
     data: DBAuthScheme = Body(
         ...,
-        examples={
+        openapi_examples={
             "root": {
                 "summary": "Войти под root",
                 "value": {"username": "root", "password": "<ROOT_PASSWORD>"},
@@ -36,6 +37,7 @@ async def db_auth(
         },
     ),
 ) -> JSONResponse:
+    await viewing_event(request)
     users_file = Path("server/core/db_files/users.json")
 
     async with aiofiles.open(users_file, "r", encoding="utf-8") as f:

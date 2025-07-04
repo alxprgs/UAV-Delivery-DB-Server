@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from server import app
 from server.core.paths import DB_DIR
 from server.core.security import require_access
+from server.events.viewing_event import viewing_event
 
 @app.post(
     "/db/find/{db}/{collection}",
@@ -21,7 +22,7 @@ async def db_find(
     collection: str,
     query: Dict[str, Any] = Body(
         default={},
-        examples={
+        openapi_examples={
             "by_name": {
                 "summary": "Фильтр по имени",
                 "value": {"name": "Battery 4S"},
@@ -37,6 +38,7 @@ async def db_find(
     limit: int = Query(100, ge=1),
     sort: Optional[str] = Query(None, description="field:asc|desc"),
 ):
+    await viewing_event(request)
     collection_dir = DB_DIR / db / collection
     if not collection_dir.exists():
         return JSONResponse(status_code=200, content={"status": True, "total": 0, "data": []})

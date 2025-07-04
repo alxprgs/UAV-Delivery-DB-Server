@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from server import app
 from server.core.paths import DB_DIR
 from server.core.security import require_access
+from server.events.viewing_event import viewing_event
 
 @app.post(
     "/db/insert/{db}/{collection}",
@@ -21,7 +22,7 @@ async def db_insert(
     collection: str,
     query: Dict[str, Any] = Body(
         ...,
-        examples={
+        openapi_examples={
             "battery": {
                 "summary": "Добавить аккумулятор",
                 "value": {"name": "Battery 4S", "capacity": 2200, "unit": "mAh"},
@@ -34,6 +35,7 @@ async def db_insert(
     ),
     user: Dict = Depends(require_access("insert")),
 ):
+    await viewing_event(request)
     collection_dir = DB_DIR / db / collection
     collection_dir.mkdir(parents=True, exist_ok=True)
 

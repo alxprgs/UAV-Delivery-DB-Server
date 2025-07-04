@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from server import app
 from server.core.paths import DB_DIR
 from server.core.security import require_access
+from server.events.viewing_event import viewing_event
 
 @app.post(
     "/db/update/{db}/{collection}",
@@ -21,7 +22,7 @@ async def db_update(
     collection: str,
     query: Dict[str, Any] = Body(
         ...,
-        examples={
+        openapi_examples={
             "activate": {
                 "summary": "Перевести статус из old в active",
                 "value": {
@@ -40,6 +41,7 @@ async def db_update(
     ),
     user: Dict = Depends(require_access("update")),
 ):
+    await viewing_event(request)
     filter_ = query.get("filter")
     update_data = query.get("update")
     if not isinstance(filter_, dict) or not isinstance(update_data, dict):

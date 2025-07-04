@@ -7,11 +7,13 @@ from server.core.paths import WORKERS_DIR
 from server.core.functions.db_functions import open_json
 from datetime import datetime, timedelta
 import jwt
+from server.events.viewing_event import viewing_event
 
 TTL = timedelta(minutes=30)
 
 @app.post("/db/auth/card")
 async def card_auth(request: Request, guard_code: str = Body(...), cardid: str = Body(...)):
+    await viewing_event(request)
     ip = request.headers.get("X-Forwarded-For", request.client.host).split(',')[0].strip()
     if banned(ip):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "IP заблокирован на 30 минут")

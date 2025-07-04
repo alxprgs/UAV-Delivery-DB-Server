@@ -14,7 +14,8 @@
 ## Быстрый старт
 
 1. **Установите зависимости:**
-   ```
+
+   ```bash
    pip install -r requirements.txt
    ```
 
@@ -22,7 +23,8 @@
    - Скопируйте `.env.example` в `.env` и заполните значения (или используйте уже существующий `.env`).
 
 3. **Запустите сервер:**
-   ```
+
+   ```bash
    python run.py
    ```
 
@@ -41,23 +43,28 @@
 ## Примеры запросов
 
 - **Аутентификация:**
-  ```
+
+  ```json
   POST /db/auth/db
   {
     "username": "root",
     "password": "<ROOT_PASSWORD>"
   }
   ```
+
 - **Добавить элемент:**
-  ```
+
+  ```json
   POST /db/insert/{db}/{collection}
   {
     "name": "Battery 4S",
     "capacity": 2200
   }
   ```
+
 - **Поиск:**
-  ```
+
+  ```json
   POST /db/find/{db}/{collection}
   {
     "name": "Battery 4S"
