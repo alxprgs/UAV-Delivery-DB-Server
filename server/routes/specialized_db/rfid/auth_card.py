@@ -12,7 +12,7 @@ from server.core.api.schemes.SpecializedDBRfidCardAuthScheme import SpecializedD
 
 TTL = timedelta(minutes=30)
 
-@app.post("/db/auth/card")
+@app.post("/db/specialized/auth/card")
 async def specialized_db_rfid_card_auth(request: Request, data: SpecializedDBRfidCardAuthScheme):
     await viewing_event(request)
     ip = request.headers.get("X-Forwarded-For", request.client.host).split(',')[0].strip()

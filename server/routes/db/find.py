@@ -13,7 +13,7 @@ from server.events.viewing_event import viewing_event
 from server.core.api.schemes.DBFindScheme import DBFindScheme
 
 @app.post(
-    "/db/find/{db}/{collection}",
+    "/db/base/find/{db}/{collection}",
     status_code=status.HTTP_200_OK,
     tags=["db"],
 )

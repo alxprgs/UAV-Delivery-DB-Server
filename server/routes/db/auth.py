@@ -14,7 +14,7 @@ from server.events.viewing_event import viewing_event
 from server.core.api.schemes.DBAuthScheme import DBAuthScheme
 
 @app.post(
-    "/db/auth/db",
+    "/db/base/auth/db",
     status_code=status.HTTP_200_OK,
     tags=["db"],
 )

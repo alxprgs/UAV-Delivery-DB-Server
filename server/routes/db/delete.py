@@ -11,7 +11,7 @@ from server.core.api.schemes.DBDeleteScheme import DBDeleteScheme
 from server.core.security import require_access
 
 
-@app.post("/db/delete/{db}/{collection}", status_code=status.HTTP_200_OK, tags=["db"])
+@app.post("/db/base/delete/{db}/{collection}", status_code=status.HTTP_200_OK, tags=["db"])
 async def db_delete(
     request: Request,
     data: DBDeleteScheme,

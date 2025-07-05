@@ -11,7 +11,7 @@ from server.core.api.schemes.DBInsertScheme import DBInsertScheme
 from server.core.security import require_access
 
 @app.post(
-    "/db/insert/{db}/{collection}",
+    "/db/base/insert/{db}/{collection}",
     status_code=status.HTTP_201_CREATED,
     tags=["db"],
 )

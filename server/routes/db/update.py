@@ -11,7 +11,7 @@ from server.core.api.schemes.DBUpdateScheme import DBUpdateScheme
 from server.core.security import require_access
 
 @app.post(
-    "/db/update/{db}/{collection}",
+    "/db/base/update/{db}/{collection}",
     status_code=status.HTTP_200_OK,
     tags=["db"],
 )

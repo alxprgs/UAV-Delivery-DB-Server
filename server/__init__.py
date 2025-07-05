@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import AsyncGenerator
 from datetime import date, datetime
 from contextlib import asynccontextmanager
@@ -12,6 +11,7 @@ from server.core.logger_module import logger
 from server.events.beckup_event import backup_event
 from server.core.inits.init_ceo_worker import init_ceo_worker
 from server.core.inits.init_root_user import init_root_user
+
 scheduler = AsyncIOScheduler(timezone="Europe/Moscow")
 
 @asynccontextmanager
@@ -44,7 +44,7 @@ docs_config = {
 app = FastAPI(
     debug=settings.DEV,
     title="База данных специально для UAV-Delivery",
-    version=f"{'dev' if settings.DEV else 'stable'} 0.1.0 {date.today().isoformat()}",
+    version=f"{'dev' if settings.DEV else 'stable'} 0.1.1 {date.today().isoformat()}",
     lifespan=lifespan,
     **docs_config,
 )
